@@ -1,0 +1,7 @@
+{
+  "name": "Copy of SoulJournal - Life Experiences & Personal Diary",
+  "description": "A secure, beautiful space to document your life journey, with options for private reflection and public sharing of experiences.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
