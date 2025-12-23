@@ -52,7 +52,11 @@ export const PostProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (!error && data) {
+    if (error) {
+      console.error("Error fetching posts:", error.message);
+      return;
+    }
+    if (data) {
       setPosts(data.map(mapPost));
     }
   };
@@ -73,19 +77,21 @@ export const PostProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    if (!user) {
+      setPosts([]);
+      setComments([]);
+      setLoading(false);
+      return;
+    }
+
     const initData = async () => {
-      if (!user) {
-        setPosts([]);
-        setComments([]);
-        setLoading(false);
-        return;
-      }
       setLoading(true);
       await refreshData();
       setLoading(false);
     };
     initData();
 
+    // Listen for changes
     const entriesChannel = supabase
       .channel('entries-realtime')
       .on('postgres_changes', { event: '*', table: 'entries' }, (payload) => {
@@ -126,6 +132,8 @@ export const PostProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const addPost = async (postData: any) => {
     if (!user) return false;
+    
+    // Explicitly include all required fields for the entries table
     const { data, error } = await supabase.from('entries').insert([
       {
         author_id: user.id,
@@ -133,20 +141,22 @@ export const PostProvider: React.FC<{ children: React.ReactNode }> = ({ children
         title: postData.title,
         content: postData.content,
         mood: postData.mood,
-        visibility: postData.visibility,
+        visibility: postData.visibility || Visibility.PRIVATE,
       }
     ]).select();
 
     if (error) {
-      console.error("Supabase Save Error:", error.message);
+      console.error("Supabase Insert Error:", error.message, error.details);
       return false;
     }
     
     if (data && data[0]) {
       const newPost = mapPost(data[0]);
       setPosts(prev => [newPost, ...prev]);
+      return true;
     }
-    return true;
+    
+    return false;
   };
 
   const updatePost = async (id: string, postData: Partial<Post>) => {
@@ -170,8 +180,9 @@ export const PostProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (data && data[0]) {
       const updatedPost = mapPost(data[0]);
       setPosts(prev => prev.map(p => p.id === id ? updatedPost : p));
+      return true;
     }
-    return true;
+    return false;
   };
 
   const deletePost = async (id: string) => {
@@ -197,13 +208,15 @@ export const PostProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (!error && data && data[0]) {
       setComments(prev => [...prev, mapComment(data[0])]);
+    } else if (error) {
+      console.error("Comment Error:", error.message);
     }
   };
 
   const deleteComment = async (id: string) => {
     const { error } = await supabase.from('comments').delete().eq('id', id);
     if (!error) {
-      setComments(comments.filter(c => c.id !== id));
+      setComments(prev => prev.filter(c => c.id !== id));
     }
   };
 
