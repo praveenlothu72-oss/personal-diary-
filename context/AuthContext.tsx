@@ -4,9 +4,12 @@ import { User, AuthState } from '../types';
 import { supabase } from '../lib/supabase';
 
 interface AuthContextType extends AuthState {
-  login: (email: string, password: string) => Promise<boolean>;
-  signup: (username: string, email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; unverified?: boolean }>;
+  signup: (username: string, email: string, password: string) => Promise<{ success: boolean; needsVerification?: boolean; error?: string }>;
   logout: () => void;
+  resendVerification: (email: string) => Promise<{ success: boolean; error?: string }>;
+  verifyOtp: (email: string, token: string) => Promise<{ success: boolean; error?: string }>;
+  refreshUser: () => Promise<void>;
   updateUser: (data: Partial<User>) => Promise<void>;
   loading: boolean;
 }
@@ -17,28 +20,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const mapUser = (supabaseUser: any): User => ({
+    id: supabaseUser.id,
+    email: supabaseUser.email || '',
+    username: supabaseUser.user_metadata?.username || supabaseUser.email?.split('@')[0],
+    bio: supabaseUser.user_metadata?.bio || '',
+    emailConfirmed: !!supabaseUser.email_confirmed_at,
+  });
+
+  const refreshUser = async () => {
+    const { data: { user: supabaseUser }, error } = await supabase.auth.getUser();
+    if (supabaseUser) {
+      setUser(mapUser(supabaseUser));
+    }
+  };
+
   useEffect(() => {
+    // Check initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        setUser({
-          id: session.user.id,
-          email: session.user.email || '',
-          username: session.user.user_metadata?.username || session.user.email?.split('@')[0],
-          bio: session.user.user_metadata?.bio || '',
-        });
+        setUser(mapUser(session.user));
       }
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    // Listen for auth changes (including clicking the confirmation link)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
-        setUser({
-          id: session.user.id,
-          email: session.user.email || '',
-          username: session.user.user_metadata?.username || session.user.email?.split('@')[0],
-          bio: session.user.user_metadata?.bio || '',
-        });
-      } else {
+        setUser(mapUser(session.user));
+      } else if (event === 'SIGNED_OUT') {
         setUser(null);
       }
       setLoading(false);
@@ -47,18 +57,61 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return !error;
+  const login = async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    
+    if (error) {
+      const isUnverified = error.message.toLowerCase().includes('confirm') || error.message.toLowerCase().includes('verified');
+      return { 
+        success: false, 
+        error: error.message,
+        unverified: isUnverified 
+      };
+    }
+    return { success: true };
   };
 
-  const signup = async (username: string, email: string, password: string): Promise<boolean> => {
-    const { error } = await supabase.auth.signUp({
+  const signup = async (username: string, email: string, password: string) => {
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { username } },
+      options: { 
+        data: { username },
+        emailRedirectTo: window.location.origin
+      },
     });
-    return !error;
+    
+    if (error) return { success: false, error: error.message };
+    
+    const needsVerification = data.user && !data.user.email_confirmed_at;
+    return { success: true, needsVerification };
+  };
+
+  const verifyOtp = async (email: string, token: string) => {
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: 'signup'
+    });
+    
+    if (error) return { success: false, error: error.message };
+    if (data.user) {
+      setUser(mapUser(data.user));
+      return { success: true };
+    }
+    return { success: false, error: 'Verification failed' };
+  };
+
+  const resendVerification = async (email: string) => {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email,
+      options: {
+        emailRedirectTo: window.location.origin
+      }
+    });
+    if (error) return { success: false, error: error.message };
+    return { success: true };
   };
 
   const logout = async () => {
@@ -74,19 +127,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     
     if (!authError && user) {
-      // Sync username across existing entries and comments if it changed
-      if (data.username && data.username !== user.username) {
-        await Promise.all([
-          supabase.from('entries').update({ author_name: data.username }).eq('author_id', user.id),
-          supabase.from('comments').update({ author_name: data.username }).eq('author_id', user.id)
-        ]);
-      }
       setUser({ ...user, ...data });
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, signup, logout, updateUser, loading }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, signup, logout, resendVerification, verifyOtp, refreshUser, updateUser, loading }}>
       {!loading && children}
     </AuthContext.Provider>
   );

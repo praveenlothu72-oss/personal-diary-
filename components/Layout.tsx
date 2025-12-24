@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { 
   Home, 
@@ -8,18 +8,48 @@ import {
   User, 
   LogOut, 
   PenTool,
-  Globe
+  Globe,
+  AlertTriangle,
+  X,
+  Mail,
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, logout, isAuthenticated } = useAuth();
+  const { user, logout, isAuthenticated, resendVerification, refreshUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [showBanner, setShowBanner] = useState(true);
+  const [isResending, setIsResending] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [resentStatus, setResentStatus] = useState<string | null>(null);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const handleResend = async () => {
+    if (!user?.email || isResending) return;
+    setIsResending(true);
+    const result = await resendVerification(user.email);
+    if (result.success) {
+      setResentStatus('Sent!');
+      setTimeout(() => setResentStatus(null), 3000);
+    } else {
+      setResentStatus('Error');
+      setTimeout(() => setResentStatus(null), 3000);
+    }
+    setIsResending(false);
+  };
+
+  const handleRefresh = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    await refreshUser();
+    setTimeout(() => setIsRefreshing(false), 1000);
   };
 
   const navItems = [
@@ -32,6 +62,39 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col pb-20 md:pb-0">
+      {/* Verification Banner */}
+      {user && !user.emailConfirmed && showBanner && (
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-3 flex items-center justify-between animate-fade-in relative z-[60]">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-amber-900 text-xs md:text-sm font-semibold">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+              <span>Verify your email to like and share stories publicly.</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={handleResend}
+                disabled={isResending}
+                className="text-indigo-700 hover:text-indigo-900 underline disabled:opacity-50"
+              >
+                {isResending ? 'Resending...' : resentStatus || 'Resend Link'}
+              </button>
+              <span className="text-amber-300">|</span>
+              <button 
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="flex items-center gap-1 text-emerald-700 hover:text-emerald-900 underline disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                I've verified
+              </button>
+            </div>
+          </div>
+          <button onClick={() => setShowBanner(false)} className="text-amber-400 hover:text-amber-600 p-1">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      )}
+
       {/* Top Navbar */}
       <header className="sticky top-0 z-50 glass-effect border-b border-gray-200">
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">

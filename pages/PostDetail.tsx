@@ -10,7 +10,8 @@ import {
   Edit2,
   Trash2,
   Send,
-  Loader2
+  Loader2,
+  Heart
 } from 'lucide-react';
 import { usePosts } from '../context/PostContext';
 import { useAuth } from '../context/AuthContext';
@@ -21,10 +22,11 @@ const PostDetail: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { posts, comments, loading, addComment, deleteComment, deletePost } = usePosts();
+  const { posts, comments, loading, addComment, deleteComment, deletePost, toggleLike } = usePosts();
   
   const [commentText, setCommentText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLiking, setIsLiking] = useState(false);
   
   const post = posts.find(p => p.id === id);
   const postComments = comments
@@ -69,6 +71,13 @@ const PostDetail: React.FC = () => {
     setIsSubmitting(false);
   };
 
+  const handleLike = async () => {
+    if (isLiking) return;
+    setIsLiking(true);
+    await toggleLike(post.id);
+    setTimeout(() => setIsLiking(false), 300);
+  };
+
   return (
     <div className="max-w-3xl mx-auto animate-fade-in">
        <button 
@@ -79,7 +88,7 @@ const PostDetail: React.FC = () => {
         Back
       </button>
 
-      <article className="bg-white rounded-3xl p-8 md:p-12 shadow-sm border border-gray-100 mb-10">
+      <article className="bg-white rounded-3xl p-8 md:p-12 shadow-sm border border-gray-100 mb-10 relative">
         <div className="flex justify-between items-start mb-10">
           <div className="flex items-center gap-4">
              <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-700 text-2xl font-black border border-indigo-100">
@@ -108,29 +117,39 @@ const PostDetail: React.FC = () => {
              </div>
           </div>
 
-          {isOwner && (
-            <div className="flex gap-2">
-               <Link to={`/edit/${post.id}`} className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors">
-                  <Edit2 className="w-5 h-5" />
-               </Link>
-               <button onClick={handlePostDelete} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-                  <Trash2 className="w-5 h-5" />
-               </button>
-            </div>
-          )}
+          <div className="flex gap-2">
+            <button 
+              onClick={handleLike}
+              className={`flex items-center gap-1.5 p-2 rounded-xl transition-all duration-300 ${isLiking ? 'scale-125' : 'scale-100'} ${post.hasLiked ? 'text-rose-500 bg-rose-50' : 'text-gray-400 hover:bg-gray-50'}`}
+            >
+              <Heart className={`w-5 h-5 ${post.hasLiked ? 'fill-current' : ''}`} />
+              <span className="text-sm font-bold">{post.likesCount}</span>
+            </button>
+            
+            {isOwner && (
+              <>
+                 <Link to={`/edit/${post.id}`} className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors">
+                    <Edit2 className="w-5 h-5" />
+                 </Link>
+                 <button onClick={handlePostDelete} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors">
+                    <Trash2 className="w-5 h-5" />
+                 </button>
+              </>
+            )}
+          </div>
         </div>
 
-        <div className="mb-8 flex items-center gap-4">
+        <div className="mb-8 flex flex-col md:flex-row md:items-center gap-4">
            {moodInfo && (
               <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-2xl font-bold text-sm ${moodInfo.color}`}>
                 {moodInfo.icon}
                 {post.mood}
               </div>
            )}
-           <h1 className="text-4xl font-black text-gray-900 tracking-tight leading-tight">{post.title}</h1>
+           <h1 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight leading-tight">{post.title}</h1>
         </div>
 
-        <div className="prose prose-indigo max-w-none text-gray-700 text-lg leading-relaxed whitespace-pre-wrap">
+        <div className="prose prose-indigo max-w-none text-gray-700 text-lg leading-relaxed whitespace-pre-wrap mb-10">
           {post.content}
         </div>
       </article>

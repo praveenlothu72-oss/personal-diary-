@@ -8,11 +8,12 @@ interface PostContextType {
   posts: Post[];
   comments: Comment[];
   loading: boolean;
-  addPost: (post: Omit<Post, 'id' | 'createdAt' | 'updatedAt' | 'authorId' | 'authorName'>) => Promise<boolean>;
+  addPost: (post: Omit<Post, 'id' | 'createdAt' | 'updatedAt' | 'authorId' | 'authorName' | 'likesCount' | 'hasLiked'>) => Promise<boolean>;
   updatePost: (id: string, post: Partial<Post>) => Promise<boolean>;
   deletePost: (id: string) => Promise<boolean>;
   addComment: (postId: string, content: string) => Promise<void>;
   deleteComment: (id: string) => Promise<void>;
+  toggleLike: (postId: string) => Promise<void>;
   refreshData: () => Promise<void>;
 }
 
@@ -22,9 +23,10 @@ export const PostProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { user } = useAuth();
   const [posts, setPosts] = useState<Post[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
+  const [userLikes, setUserLikes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const mapPost = (p: any): Post => ({
+  const mapPost = (p: any, likes: string[] = userLikes): Post => ({
     id: p.id,
     authorId: p.author_id,
     authorName: p.author_name,
@@ -34,6 +36,8 @@ export const PostProvider: React.FC<{ children: React.ReactNode }> = ({ children
     visibility: p.visibility as Visibility,
     createdAt: p.created_at,
     updatedAt: p.updated_at,
+    likesCount: p.likes_count || 0,
+    hasLiked: likes.includes(p.id)
   });
 
   const mapComment = (c: any): Comment => ({
@@ -46,18 +50,32 @@ export const PostProvider: React.FC<{ children: React.ReactNode }> = ({ children
     updatedAt: c.updated_at,
   });
 
-  const fetchPosts = async () => {
+  const fetchLikes = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('likes')
+        .select('post_id')
+        .eq('user_id', userId);
+      
+      if (!error && data) {
+        const likedIds = data.map(l => l.post_id);
+        setUserLikes(likedIds);
+        return likedIds;
+      }
+    } catch (e) {
+      console.warn("Likes table might not exist yet.");
+    }
+    return [];
+  };
+
+  const fetchPosts = async (likedIds: string[] = userLikes) => {
     const { data, error } = await supabase
       .from('entries')
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error("Error fetching posts:", error.message);
-      return;
-    }
-    if (data) {
-      setPosts(data.map(mapPost));
+    if (!error && data) {
+      setPosts(data.map(p => mapPost(p, likedIds)));
     }
   };
 
@@ -73,13 +91,16 @@ export const PostProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const refreshData = async () => {
-    await Promise.all([fetchPosts(), fetchComments()]);
+    if (!user) return;
+    const likedIds = await fetchLikes(user.id);
+    await Promise.all([fetchPosts(likedIds), fetchComments()]);
   };
 
   useEffect(() => {
     if (!user) {
       setPosts([]);
       setComments([]);
+      setUserLikes([]);
       setLoading(false);
       return;
     }
@@ -90,96 +111,91 @@ export const PostProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     };
     initData();
+  }, [user?.id, user?.emailConfirmed]); // Critical: Refresh if email verification status changes
 
-    // Listen for changes
-    const entriesChannel = supabase
-      .channel('entries-realtime')
-      .on('postgres_changes', { event: '*', table: 'entries' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          setPosts((prev) => {
-            if (prev.find(p => p.id === payload.new.id)) return prev;
-            return [mapPost(payload.new), ...prev];
-          });
-        } else if (payload.eventType === 'UPDATE') {
-          setPosts((prev) => prev.map((p) => (p.id === payload.new.id ? mapPost(payload.new) : p)));
-        } else if (payload.eventType === 'DELETE') {
-          setPosts((prev) => prev.filter((p) => p.id !== payload.old.id));
+  const toggleLike = async (postId: string) => {
+    if (!user || !user.emailConfirmed) return;
+
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+
+    const isCurrentlyLiked = post.hasLiked;
+    
+    // Optimistic Update
+    setPosts(prev => prev.map(p => {
+      if (p.id === postId) {
+        return {
+          ...p,
+          hasLiked: !isCurrentlyLiked,
+          likesCount: isCurrentlyLiked ? Math.max(0, p.likesCount - 1) : p.likesCount + 1
+        };
+      }
+      return p;
+    }));
+
+    try {
+      if (isCurrentlyLiked) {
+        setUserLikes(prev => prev.filter(id => id !== postId));
+        const { error } = await supabase.from('likes').delete().match({ user_id: user.id, post_id: postId });
+        if (!error) {
+          await supabase.from('entries').update({ likes_count: Math.max(0, post.likesCount - 1) }).eq('id', postId);
+        } else {
+          throw error;
         }
-      })
-      .subscribe();
-
-    const commentsChannel = supabase
-      .channel('comments-realtime')
-      .on('postgres_changes', { event: '*', table: 'comments' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          setComments((prev) => {
-            if (prev.find(c => c.id === payload.new.id)) return prev;
-            return [...prev, mapComment(payload.new)];
-          });
-        } else if (payload.eventType === 'UPDATE') {
-          setComments((prev) => prev.map((c) => (c.id === payload.new.id ? mapComment(payload.new) : c)));
-        } else if (payload.eventType === 'DELETE') {
-          setComments((prev) => prev.filter((c) => c.id !== payload.old.id));
+      } else {
+        setUserLikes(prev => [...prev, postId]);
+        const { error } = await supabase.from('likes').insert([{ user_id: user.id, post_id: postId }]);
+        if (!error) {
+          await supabase.from('entries').update({ likes_count: post.likesCount + 1 }).eq('id', postId);
+        } else {
+          throw error;
         }
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(entriesChannel);
-      supabase.removeChannel(commentsChannel);
-    };
-  }, [user]);
+      }
+    } catch (err) {
+      console.error("Like operation failed:", err);
+      // Revert Optimistic Update on failure
+      setPosts(prev => prev.map(p => {
+        if (p.id === postId) {
+          return { ...p, hasLiked: isCurrentlyLiked, likesCount: post.likesCount };
+        }
+        return p;
+      }));
+      alert("Like failed. Make sure the database schema is fully set up.");
+    }
+  };
 
   const addPost = async (postData: any) => {
     if (!user) return false;
-    
-    // Explicitly include all required fields for the entries table
-    const { data, error } = await supabase.from('entries').insert([
-      {
+    const { data, error } = await supabase.from('entries').insert([{
         author_id: user.id,
         author_name: user.username,
         title: postData.title,
         content: postData.content,
         mood: postData.mood,
         visibility: postData.visibility || Visibility.PRIVATE,
-      }
-    ]).select();
+        likes_count: 0
+      }]).select();
 
-    if (error) {
-      console.error("Supabase Insert Error:", error.message, error.details);
-      return false;
-    }
-    
+    if (error) return false;
     if (data && data[0]) {
-      const newPost = mapPost(data[0]);
-      setPosts(prev => [newPost, ...prev]);
+      setPosts(prev => [mapPost(data[0]), ...prev]);
       return true;
     }
-    
     return false;
   };
 
   const updatePost = async (id: string, postData: Partial<Post>) => {
-    const { data, error } = await supabase
-      .from('entries')
-      .update({
+    const { data, error } = await supabase.from('entries').update({
         title: postData.title,
         content: postData.content,
         mood: postData.mood,
         visibility: postData.visibility,
         updated_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-      .select();
+      }).eq('id', id).select();
 
-    if (error) {
-      console.error("Supabase Update Error:", error.message);
-      return false;
-    }
-
+    if (error) return false;
     if (data && data[0]) {
-      const updatedPost = mapPost(data[0]);
-      setPosts(prev => prev.map(p => p.id === id ? updatedPost : p));
+      setPosts(prev => prev.map(p => p.id === id ? mapPost(data[0]) : p));
       return true;
     }
     return false;
@@ -187,41 +203,32 @@ export const PostProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const deletePost = async (id: string) => {
     const { error } = await supabase.from('entries').delete().eq('id', id);
-    if (error) {
-      console.error("Supabase Delete Error:", error.message);
-      return false;
-    }
+    if (error) return false;
     setPosts(prev => prev.filter(p => p.id !== id));
     return true;
   };
 
   const addComment = async (postId: string, content: string) => {
     if (!user) return;
-    const { data, error } = await supabase.from('comments').insert([
-      {
+    const { data, error } = await supabase.from('comments').insert([{
         post_id: postId,
         author_id: user.id,
         author_name: user.username,
         content: content,
-      }
-    ]).select();
+      }]).select();
 
     if (!error && data && data[0]) {
       setComments(prev => [...prev, mapComment(data[0])]);
-    } else if (error) {
-      console.error("Comment Error:", error.message);
     }
   };
 
   const deleteComment = async (id: string) => {
     const { error } = await supabase.from('comments').delete().eq('id', id);
-    if (!error) {
-      setComments(prev => prev.filter(c => c.id !== id));
-    }
+    if (!error) setComments(prev => prev.filter(c => c.id !== id));
   };
 
   return (
-    <PostContext.Provider value={{ posts, comments, loading, addPost, updatePost, deletePost, addComment, deleteComment, refreshData }}>
+    <PostContext.Provider value={{ posts, comments, loading, addPost, updatePost, deletePost, addComment, deleteComment, toggleLike, refreshData }}>
       {children}
     </PostContext.Provider>
   );

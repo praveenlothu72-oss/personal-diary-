@@ -20,6 +20,7 @@ export interface User {
   email: string;
   avatar?: string;
   bio?: string;
+  emailConfirmed: boolean;
 }
 
 export interface Comment {
@@ -42,6 +43,8 @@ export interface Post {
   visibility: Visibility;
   createdAt: string;
   updatedAt: string;
+  likesCount: number;
+  hasLiked: boolean;
 }
 
 export interface AuthState {

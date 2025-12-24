@@ -1,7 +1,7 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { MessageCircle, Clock, Lock, Globe, Edit2, Trash2, Heart } from 'lucide-react';
+import { MessageCircle, Clock, Lock, Globe, Edit2, Trash2, Heart, AlertCircle } from 'lucide-react';
 import { Post, Visibility } from '../types';
 import { MOOD_DATA } from '../constants';
 import { useAuth } from '../context/AuthContext';
@@ -14,7 +14,10 @@ interface EntryCardProps {
 
 const EntryCard: React.FC<EntryCardProps> = ({ post, showAuthor = true }) => {
   const { user } = useAuth();
-  const { deletePost, comments } = usePosts();
+  const { deletePost, toggleLike, comments } = usePosts();
+  const [isLiking, setIsLiking] = useState(false);
+  const [showVerifyTooltip, setShowVerifyTooltip] = useState(false);
+  
   const isOwner = user?.id === post.authorId;
   const moodInfo = post.mood ? MOOD_DATA[post.mood] : null;
   const postComments = comments.filter(c => c.postId === post.id);
@@ -24,6 +27,23 @@ const EntryCard: React.FC<EntryCardProps> = ({ post, showAuthor = true }) => {
     if (confirm('Delete this entry?')) {
       deletePost(post.id);
     }
+  };
+
+  const handleLike = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!user?.emailConfirmed) {
+      setShowVerifyTooltip(true);
+      setTimeout(() => setShowVerifyTooltip(false), 3000);
+      return;
+    }
+
+    if (isLiking) return;
+    
+    setIsLiking(true);
+    await toggleLike(post.id);
+    setTimeout(() => setIsLiking(false), 300);
   };
 
   return (
@@ -82,9 +102,26 @@ const EntryCard: React.FC<EntryCardProps> = ({ post, showAuthor = true }) => {
               <MessageCircle className="w-4 h-4" />
               <span>{postComments.length}</span>
             </div>
-            <div className="flex items-center gap-1.5 hover:text-red-500 transition-colors">
-              <Heart className="w-4 h-4" />
-              <span>{Math.floor(Math.random() * 5)}</span>
+            
+            <div className="relative">
+              <button 
+                onClick={handleLike}
+                className={`flex items-center gap-1.5 transition-all duration-300 transform ${isLiking ? 'scale-150' : 'scale-100'} ${post.hasLiked ? 'text-rose-500 font-bold' : 'hover:text-rose-500'} ${!user?.emailConfirmed ? 'opacity-30' : ''}`}
+                title={!user?.emailConfirmed ? "Verify email to like" : "Like story"}
+              >
+                <Heart className={`w-4 h-4 transition-all ${post.hasLiked ? 'fill-current' : ''}`} />
+                <span>{post.likesCount}</span>
+              </button>
+              
+              {showVerifyTooltip && (
+                <div className="absolute bottom-full left-0 mb-3 w-48 p-2.5 bg-gray-900 text-white text-[10px] rounded-xl shadow-2xl animate-bounce z-50">
+                  <div className="flex items-center gap-1.5 leading-tight">
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                    <span>Check your inbox! Verify your email to like experiences.</span>
+                  </div>
+                  <div className="absolute top-full left-4 w-2 h-2 bg-gray-900 rotate-45 -translate-y-1"></div>
+                </div>
+              )}
             </div>
           </div>
 
