@@ -48,12 +48,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let mounted = true;
 
-    // Check initial session
+    // Check initial session with a safety timeout
     const checkSession = async () => {
+      const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve('timeout'), 5000));
+      
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (mounted && session?.user) {
-          setUser(mapUser(session.user));
+        const result = await Promise.race([
+          supabase.auth.getSession(),
+          timeoutPromise
+        ]);
+
+        if (result === 'timeout') {
+          console.warn("Auth: Session check timed out. Proceeding as guest.");
+        } else if (mounted) {
+          const { data: { session } } = result as any;
+          if (session?.user) {
+            setUser(mapUser(session.user));
+          }
         }
       } catch (err) {
         console.error("Auth: Session check failed", err);
@@ -149,8 +160,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, signup, logout, resendVerification, verifyOtp, refreshUser, updateUser, loading }}>
       {loading ? (
         <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
-          <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-gray-500 font-semibold">Authorizing Session...</p>
+          <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+          <p className="text-gray-500 font-bold text-sm">Synchronizing Soul...</p>
         </div>
       ) : children}
     </AuthContext.Provider>

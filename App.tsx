@@ -22,13 +22,15 @@ interface ErrorBoundaryState {
 }
 
 // Robust Error Boundary to prevent white screen crashes.
-// Fixed TS errors by using explicit property initializers and optional children prop.
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  // Use property initializer for state to ensure it is recognized by TypeScript.
-  public state: ErrorBoundaryState = {
-    hasError: false,
-    error: null,
-  };
+// Fixed TS error on line 60 by using explicit constructor to help TypeScript infer 'props' from React.Component.
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = {
+      hasError: false,
+      error: null,
+    };
+  }
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
@@ -39,7 +41,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 
   public render() {
-    // Accessing this.state is now safe as it's explicitly declared.
+    // Accessing this.state is safe as it's initialized in the constructor.
     if (this.state.hasError) {
       return (
         <div className="min-h-screen flex items-center justify-center p-6 bg-red-50">
@@ -56,7 +58,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
         </div>
       );
     }
-    // Accessing this.props.children is now safe.
+    // Correctly accessing children from this.props which is now recognized by the compiler.
     return this.props.children;
   }
 }
