@@ -1,24 +1,20 @@
 
 import React from 'react';
-import ReactDOM from 'react-dom/client';
+import { createRoot } from 'react-dom/client';
 import App from './App';
 
-console.log("SoulJournal: Application bootstrapping started...");
+console.log("SoulJournal: Initializing application...");
 
-const rootElement = document.getElementById('root');
-if (!rootElement) {
-  console.error("SoulJournal Error: Could not find root element to mount to");
-  throw new Error("Could not find root element to mount to");
-}
+const container = document.getElementById('root');
 
-try {
-  const root = ReactDOM.createRoot(rootElement);
+if (container) {
+  const root = createRoot(container);
   root.render(
     <React.StrictMode>
       <App />
     </React.StrictMode>
   );
-  console.log("SoulJournal: Root rendered successfully.");
-} catch (err) {
-  console.error("SoulJournal: Failed to mount application:", err);
+  console.log("SoulJournal: Ready.");
+} else {
+  console.error("SoulJournal: Root container not found!");
 }
