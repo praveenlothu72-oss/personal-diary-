@@ -139,7 +139,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           
           <Link to="/profile" className="md:hidden">
              <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold">
-               {user?.username[0].toUpperCase()}
+               {user?.username?.[0]?.toUpperCase() || '?'}
              </div>
           </Link>
         </div>

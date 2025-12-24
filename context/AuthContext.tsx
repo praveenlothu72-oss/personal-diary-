@@ -16,10 +16,17 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Helper to get the correct redirect URL for GitHub Pages / Netlify / Localhost
+/**
+ * Helper to get the correct redirect URL for GitHub Pages / Netlify / Localhost.
+ * GitHub Pages often hosts at username.github.io/repo-name/
+ */
 const getRedirectUrl = () => {
-  // Removes trailing slashes and ensures sub-directories are included
-  return window.location.origin + window.location.pathname.replace(/\/$/, '');
+  // Get the base path (e.g., /souljournal/)
+  const path = window.location.pathname;
+  // Ensure we don't include the hash parts or double slashes
+  const baseUrl = window.location.origin + path.replace(/\/$/, '');
+  console.log('Generated Redirect URL for Supabase:', baseUrl);
+  return baseUrl;
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -50,9 +57,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     });
 
-    // Listen for auth changes (including clicking the confirmation link)
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth Event:', event);
       if (session?.user) {
         setUser(mapUser(session.user));
       } else if (event === 'SIGNED_OUT') {
@@ -65,15 +71,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       const isUnverified = error.message.toLowerCase().includes('confirm') || error.message.toLowerCase().includes('verified');
-      return { 
-        success: false, 
-        error: error.message,
-        unverified: isUnverified 
-      };
+      return { success: false, error: error.message, unverified: isUnverified };
     }
     return { success: true };
   };
@@ -89,7 +90,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     
     if (error) return { success: false, error: error.message };
-    
     const needsVerification = data.user && !data.user.email_confirmed_at;
     return { success: true, needsVerification };
   };
@@ -103,7 +103,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     if (error) return { success: false, error: error.message };
     
-    // Explicitly refresh user data to ensure the UI updates with confirmed status
     if (data.user) {
       const { data: { user: refreshedUser } } = await supabase.auth.getUser();
       if (refreshedUser) {
@@ -111,16 +110,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: true };
       }
     }
-    return { success: false, error: 'Verification failed' };
+    return { success: false, error: 'Verification succeeded but session failed to refresh.' };
   };
 
   const resendVerification = async (email: string) => {
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email: email,
-      options: {
-        emailRedirectTo: getRedirectUrl()
-      }
+      options: { emailRedirectTo: getRedirectUrl() }
     });
     if (error) return { success: false, error: error.message };
     return { success: true };
@@ -132,12 +129,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateUser = async (data: Partial<User>) => {
     const { error: authError } = await supabase.auth.updateUser({
-      data: {
-        username: data.username,
-        bio: data.bio,
-      }
+      data: { username: data.username, bio: data.bio }
     });
-    
     if (!authError && user) {
       setUser({ ...user, ...data });
     }

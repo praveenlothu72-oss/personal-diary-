@@ -28,7 +28,7 @@ const Profile: React.FC = () => {
           <div className="relative -mt-16 mb-6">
             <div className="w-32 h-32 rounded-3xl bg-white p-1.5 shadow-xl mx-auto">
                <div className="w-full h-full rounded-[1.25rem] bg-indigo-50 border-4 border-white flex items-center justify-center text-indigo-700 text-4xl font-black">
-                  {user?.username[0].toUpperCase()}
+                  {user?.username?.[0]?.toUpperCase() || '?'}
                </div>
                <button className="absolute bottom-2 right-1/2 translate-x-16 bg-white p-2 rounded-xl shadow-lg border border-gray-100 text-gray-500 hover:text-indigo-600 transition-colors">
                   <Camera className="w-4 h-4" />

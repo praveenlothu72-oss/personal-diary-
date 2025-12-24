@@ -56,7 +56,7 @@ const EntryCard: React.FC<EntryCardProps> = ({ post, showAuthor = true }) => {
           <div className="flex items-center gap-3">
             {showAuthor && !isOwner && (
                <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold border border-indigo-100">
-                 {post.authorName[0].toUpperCase()}
+                 {post.authorName?.[0]?.toUpperCase() || '?'}
                </div>
             )}
             <div>

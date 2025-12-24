@@ -1,10 +1,18 @@
 
 import { GoogleGenAI } from "@google/genai";
 
+const getApiKey = () => {
+  try {
+    return (typeof process !== 'undefined' && process.env) ? process.env.API_KEY : null;
+  } catch (e) {
+    return null;
+  }
+};
+
 export const generateStoryIdea = async (mood: string) => {
-  const apiKey = process.env.API_KEY;
+  const apiKey = getApiKey();
   if (!apiKey) {
-    console.warn("API_KEY not found in environment. Please set it in your deployment settings.");
+    console.warn("API_KEY not found. AI features will be disabled.");
     return "Reflect on a moment from today that made you feel something new.";
   }
 
@@ -23,7 +31,7 @@ export const generateStoryIdea = async (mood: string) => {
 };
 
 export const refineEntry = async (content: string) => {
-  const apiKey = process.env.API_KEY;
+  const apiKey = getApiKey();
   if (!apiKey || !content) return content;
 
   try {
