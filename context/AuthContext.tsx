@@ -16,16 +16,9 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-/**
- * Helper to get the correct redirect URL for GitHub Pages / Netlify / Localhost.
- * GitHub Pages often hosts at username.github.io/repo-name/
- */
 const getRedirectUrl = () => {
-  // Get the base path (e.g., /souljournal/)
   const path = window.location.pathname;
-  // Ensure we don't include the hash parts or double slashes
   const baseUrl = window.location.origin + path.replace(/\/$/, '');
-  console.log('Generated Redirect URL for Supabase:', baseUrl);
   return baseUrl;
 };
 
@@ -42,32 +35,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const refreshUser = async () => {
-    const { data: { user: supabaseUser } } = await supabase.auth.getUser();
-    if (supabaseUser) {
-      setUser(mapUser(supabaseUser));
+    try {
+      const { data: { user: supabaseUser } } = await supabase.auth.getUser();
+      if (supabaseUser) {
+        setUser(mapUser(supabaseUser));
+      }
+    } catch (e) {
+      console.error("Auth: Failed to refresh user", e);
     }
   };
 
   useEffect(() => {
+    let mounted = true;
+
     // Check initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser(mapUser(session.user));
+    const checkSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (mounted && session?.user) {
+          setUser(mapUser(session.user));
+        }
+      } catch (err) {
+        console.error("Auth: Session check failed", err);
+      } finally {
+        if (mounted) setLoading(false);
       }
-      setLoading(false);
-    });
+    };
+
+    checkSession();
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        setUser(mapUser(session.user));
-      } else if (event === 'SIGNED_OUT') {
-        setUser(null);
+      if (mounted) {
+        if (session?.user) {
+          setUser(mapUser(session.user));
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null);
+        }
+        setLoading(false);
       }
-      setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -104,13 +116,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (error) return { success: false, error: error.message };
     
     if (data.user) {
-      const { data: { user: refreshedUser } } = await supabase.auth.getUser();
-      if (refreshedUser) {
-        setUser(mapUser(refreshedUser));
-        return { success: true };
-      }
+      await refreshUser();
+      return { success: true };
     }
-    return { success: false, error: 'Verification succeeded but session failed to refresh.' };
+    return { success: false, error: 'Verification succeeded but session failed.' };
   };
 
   const resendVerification = async (email: string) => {
@@ -138,7 +147,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, signup, logout, resendVerification, verifyOtp, refreshUser, updateUser, loading }}>
-      {!loading && children}
+      {loading ? (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+          <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+          <p className="text-gray-500 font-semibold">Authorizing Session...</p>
+        </div>
+      ) : children}
     </AuthContext.Provider>
   );
 };
