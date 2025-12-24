@@ -92,10 +92,10 @@ const PostDetail: React.FC = () => {
         <div className="flex justify-between items-start mb-10">
           <div className="flex items-center gap-4">
              <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-700 text-2xl font-black border border-indigo-100">
-               {post.authorName[0].toUpperCase()}
+               {post.authorName?.[0]?.toUpperCase() || '?'}
              </div>
              <div>
-               <h2 className="font-bold text-xl text-gray-900">{post.authorName}</h2>
+               <h2 className="font-bold text-xl text-gray-900">{post.authorName || 'Anonymous'}</h2>
                <div className="flex items-center gap-3 text-sm text-gray-400 mt-1">
                  <div className="flex items-center gap-1">
                     <Clock className="w-3.5 h-3.5" />
@@ -189,10 +189,10 @@ const PostDetail: React.FC = () => {
                   <div className="flex justify-between items-start mb-2">
                     <div className="flex items-center gap-3">
                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 font-bold text-xs">
-                          {comment.authorName[0].toUpperCase()}
+                          {comment.authorName?.[0]?.toUpperCase() || '?'}
                        </div>
                        <div>
-                         <h4 className="font-bold text-gray-900 text-sm">{comment.authorName}</h4>
+                         <h4 className="font-bold text-gray-900 text-sm">{comment.authorName || 'Anonymous'}</h4>
                          <span className="text-[10px] text-gray-400">{new Date(comment.createdAt).toLocaleString()}</span>
                        </div>
                     </div>

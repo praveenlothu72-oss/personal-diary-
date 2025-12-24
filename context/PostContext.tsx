@@ -28,26 +28,26 @@ export const PostProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const mapPost = (p: any, likes: string[] = userLikes): Post => ({
     id: p.id,
-    authorId: p.author_id,
-    authorName: p.author_name,
-    title: p.title,
-    content: p.content,
-    mood: p.mood as Mood,
-    visibility: p.visibility as Visibility,
-    createdAt: p.created_at,
-    updatedAt: p.updated_at,
+    authorId: p.author_id || '',
+    authorName: p.author_name || 'Anonymous',
+    title: p.title || 'Untitled Entry',
+    content: p.content || '',
+    mood: (p.mood as Mood) || Mood.REFLECTIVE,
+    visibility: (p.visibility as Visibility) || Visibility.PRIVATE,
+    createdAt: p.created_at || new Date().toISOString(),
+    updatedAt: p.updated_at || new Date().toISOString(),
     likesCount: p.likes_count || 0,
     hasLiked: likes.includes(p.id)
   });
 
   const mapComment = (c: any): Comment => ({
     id: c.id,
-    postId: c.post_id,
-    authorId: c.author_id,
-    authorName: c.author_name,
-    content: c.content,
-    createdAt: c.created_at,
-    updatedAt: c.updated_at,
+    postId: c.post_id || '',
+    authorId: c.author_id || '',
+    authorName: c.author_name || 'Anonymous',
+    content: c.content || '',
+    createdAt: c.created_at || new Date().toISOString(),
+    updatedAt: c.updated_at || new Date().toISOString(),
   });
 
   const fetchLikes = async (userId: string) => {
@@ -69,24 +69,32 @@ export const PostProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const fetchPosts = async (likedIds: string[] = userLikes) => {
-    const { data, error } = await supabase
-      .from('entries')
-      .select('*')
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('entries')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-    if (!error && data) {
-      setPosts(data.map(p => mapPost(p, likedIds)));
+      if (!error && data) {
+        setPosts(data.map(p => mapPost(p, likedIds)));
+      }
+    } catch (err) {
+      console.error("Fetch Posts Error:", err);
     }
   };
 
   const fetchComments = async () => {
-    const { data, error } = await supabase
-      .from('comments')
-      .select('*')
-      .order('created_at', { ascending: true });
+    try {
+      const { data, error } = await supabase
+        .from('comments')
+        .select('*')
+        .order('created_at', { ascending: true });
 
-    if (!error && data) {
-      setComments(data.map(mapComment));
+      if (!error && data) {
+        setComments(data.map(mapComment));
+      }
+    } catch (err) {
+      console.error("Fetch Comments Error:", err);
     }
   };
 
@@ -111,7 +119,7 @@ export const PostProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     };
     initData();
-  }, [user?.id, user?.emailConfirmed]); // Critical: Refresh if email verification status changes
+  }, [user?.id, user?.emailConfirmed]);
 
   const toggleLike = async (postId: string) => {
     if (!user || !user.emailConfirmed) return;
@@ -121,7 +129,6 @@ export const PostProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const isCurrentlyLiked = post.hasLiked;
     
-    // Optimistic Update
     setPosts(prev => prev.map(p => {
       if (p.id === postId) {
         return {
@@ -153,78 +160,97 @@ export const PostProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (err) {
       console.error("Like operation failed:", err);
-      // Revert Optimistic Update on failure
       setPosts(prev => prev.map(p => {
         if (p.id === postId) {
           return { ...p, hasLiked: isCurrentlyLiked, likesCount: post.likesCount };
         }
         return p;
       }));
-      alert("Like failed. Make sure the database schema is fully set up.");
     }
   };
 
   const addPost = async (postData: any) => {
     if (!user) return false;
-    const { data, error } = await supabase.from('entries').insert([{
-        author_id: user.id,
-        author_name: user.username,
-        title: postData.title,
-        content: postData.content,
-        mood: postData.mood,
-        visibility: postData.visibility || Visibility.PRIVATE,
-        likes_count: 0
-      }]).select();
+    try {
+      const { data, error } = await supabase.from('entries').insert([{
+          author_id: user.id,
+          author_name: user.username,
+          title: postData.title,
+          content: postData.content,
+          mood: postData.mood,
+          visibility: postData.visibility || Visibility.PRIVATE,
+          likes_count: 0
+        }]).select();
 
-    if (error) return false;
-    if (data && data[0]) {
-      setPosts(prev => [mapPost(data[0]), ...prev]);
-      return true;
+      if (error) throw error;
+      if (data && data[0]) {
+        setPosts(prev => [mapPost(data[0]), ...prev]);
+        return true;
+      }
+    } catch (err) {
+      console.error("Add Post Error:", err);
     }
     return false;
   };
 
   const updatePost = async (id: string, postData: Partial<Post>) => {
-    const { data, error } = await supabase.from('entries').update({
-        title: postData.title,
-        content: postData.content,
-        mood: postData.mood,
-        visibility: postData.visibility,
-        updated_at: new Date().toISOString(),
-      }).eq('id', id).select();
+    try {
+      const { data, error } = await supabase.from('entries').update({
+          title: postData.title,
+          content: postData.content,
+          mood: postData.mood,
+          visibility: postData.visibility,
+          updated_at: new Date().toISOString(),
+        }).eq('id', id).select();
 
-    if (error) return false;
-    if (data && data[0]) {
-      setPosts(prev => prev.map(p => p.id === id ? mapPost(data[0]) : p));
-      return true;
+      if (error) throw error;
+      if (data && data[0]) {
+        setPosts(prev => prev.map(p => p.id === id ? mapPost(data[0]) : p));
+        return true;
+      }
+    } catch (err) {
+      console.error("Update Post Error:", err);
     }
     return false;
   };
 
   const deletePost = async (id: string) => {
-    const { error } = await supabase.from('entries').delete().eq('id', id);
-    if (error) return false;
-    setPosts(prev => prev.filter(p => p.id !== id));
-    return true;
+    try {
+      const { error } = await supabase.from('entries').delete().eq('id', id);
+      if (error) throw error;
+      setPosts(prev => prev.filter(p => p.id !== id));
+      return true;
+    } catch (err) {
+      console.error("Delete Post Error:", err);
+    }
+    return false;
   };
 
   const addComment = async (postId: string, content: string) => {
     if (!user) return;
-    const { data, error } = await supabase.from('comments').insert([{
-        post_id: postId,
-        author_id: user.id,
-        author_name: user.username,
-        content: content,
-      }]).select();
+    try {
+      const { data, error } = await supabase.from('comments').insert([{
+          post_id: postId,
+          author_id: user.id,
+          author_name: user.username,
+          content: content,
+        }]).select();
 
-    if (!error && data && data[0]) {
-      setComments(prev => [...prev, mapComment(data[0])]);
+      if (!error && data && data[0]) {
+        setComments(prev => [...prev, mapComment(data[0])]);
+      }
+    } catch (err) {
+      console.error("Add Comment Error:", err);
     }
   };
 
   const deleteComment = async (id: string) => {
-    const { error } = await supabase.from('comments').delete().eq('id', id);
-    if (!error) setComments(prev => prev.filter(c => c.id !== id));
+    try {
+      const { error } = await supabase.from('comments').delete().eq('id', id);
+      if (!error) setComments(prev => prev.filter(c => c.id !== id));
+    } catch (err) {
+      console.error("Delete Comment Error:", err);
+    }
   };
 
   return (
