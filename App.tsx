@@ -1,4 +1,3 @@
-
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -21,33 +20,27 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
-// Robust Error Boundary to prevent white screen crashes.
-// Fixed property access errors (this.state, this.props) by using the directly imported Component class instead of React.Component.
+/**
+ * Robust Error Boundary to prevent white screen crashes.
+ * Using Component directly from react to ensure correct property inheritance in TypeScript.
+ */
 class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  // Explicitly declared state property for reliable TypeScript recognition across different build environments.
   public state: ErrorBoundaryState = {
     hasError: false,
     error: null,
   };
 
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-  }
-
-  // Lifecycle method to update state when an error occurs in a child component.
+  // Redundant constructor removed to prevent property shadowed error or inheritance issues in certain environments.
+  
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    // Update state so the next render will show the fallback UI.
     return { hasError: true, error };
   }
 
-  // Lifecycle method to log error information after it has been caught.
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log the error for debugging.
     console.error("App Crash Caught by Boundary:", error, errorInfo);
   }
 
   public render() {
-    // Correctly accessing this.state to check for application-wide errors.
     if (this.state.hasError) {
       return (
         <div className="min-h-screen flex items-center justify-center p-6 bg-red-50">
@@ -64,7 +57,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
         </div>
       );
     }
-    // Correctly accessing children from this.props to render the main app structure.
+    // this.props is inherited from Component<ErrorBoundaryProps, ErrorBoundaryState>
     return this.props.children;
   }
 }
