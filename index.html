@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -51,11 +50,10 @@
   </style>
   
   <!-- 
-    The browser-side entry point. 
-    If you see MIME type errors (application/octet-stream), it means your local server 
-    does not recognize the .tsx extension. Use a modern dev server or rename to .js 
-    if your environment doesn't transpile on the fly.
+    The esm.sh/run script automatically transpiles and executes scripts 
+    marked with type="text/tsx", bypassing server MIME type restrictions.
   -->
-  <script src="index.tsx" type="module"></script>
+  <script type="module" src="https://esm.sh/run"></script>
+  <script type="text/tsx" src="index.tsx"></script>
 </body>
 </html>

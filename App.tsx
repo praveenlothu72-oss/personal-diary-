@@ -22,22 +22,25 @@ interface ErrorBoundaryState {
 }
 
 // Robust Error Boundary to prevent white screen crashes.
-// Fixed property access errors (this.state, this.props) by explicitly extending React.Component.
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+// Fixed property access errors (this.state, this.props) by using the directly imported Component class instead of React.Component.
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  // Explicitly declared state property for reliable TypeScript recognition across different build environments.
+  public state: ErrorBoundaryState = {
+    hasError: false,
+    error: null,
+  };
+
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    // Properly initialize state using the class component state property.
-    this.state = {
-      hasError: false,
-      error: null,
-    };
   }
 
+  // Lifecycle method to update state when an error occurs in a child component.
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     // Update state so the next render will show the fallback UI.
     return { hasError: true, error };
   }
 
+  // Lifecycle method to log error information after it has been caught.
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // Log the error for debugging.
     console.error("App Crash Caught by Boundary:", error, errorInfo);
@@ -61,7 +64,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
         </div>
       );
     }
-    // Correctly accessing children from this.props to render the main app.
+    // Correctly accessing children from this.props to render the main app structure.
     return this.props.children;
   }
 }
