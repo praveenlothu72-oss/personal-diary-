@@ -7,13 +7,9 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Dancing+Script:wght@700&display=swap" rel="stylesheet">
   <script>
-    // Global process polyfill for browser environment
-    window.process = { 
-      env: { NODE_ENV: 'production', API_KEY: '' },
-      browser: true
-    };
+    window.process = { env: { NODE_ENV: 'production', API_KEY: '' }, browser: true };
   </script>
 <script type="importmap">
 {
@@ -32,21 +28,95 @@
 }
 </script>
 </head>
-<body class="bg-gray-50">
+<body class="bg-white overflow-hidden">
   <div id="root">
-    <div style="height: 100vh; display: flex; align-items: center; justify-content: center; font-family: 'Inter', sans-serif; color: #6366f1;">
-      <div style="text-align: center;">
-        <svg style="animation: spin 1s linear infinite; width: 48px; height: 48px; margin-bottom: 20px; margin-left: auto; margin-right: auto;" viewBox="0 0 24 24">
-          <circle style="opacity: 0.15;" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
-          <path style="opacity: 0.85;" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        <p style="font-weight: 700; font-size: 1.1rem; letter-spacing: -0.025em;">Synchronizing Your Soul...</p>
+    <div class="splash-screen">
+      <div class="content-wrapper">
+        <div class="svg-container">
+          <svg viewBox="0 0 500 150" class="soul-svg">
+            <!-- Handwriting Path for Animation -->
+            <path id="writingPath" d="M80,90 Q100,20 120,90 T160,90 M180,90 Q190,60 200,90 T220,90 M240,90 Q250,60 260,90 T280,90 M300,90 Q310,60 320,90 T340,90 M360,90 Q370,60 380,90 T400,90 M420,90 Q430,60 440,90 T460,90" fill="none" stroke="transparent" />
+            
+            <!-- Styled Text with Dash Animation -->
+            <text x="50%" y="100" text-anchor="middle" class="writing-text">SoulJournal</text>
+            
+            <!-- Pen Nib following the path -->
+            <g class="pen-nib">
+              <path d="M-4,-4 L4,-4 L0,12 Z" fill="#4f46e5" />
+              <rect x="-1" y="-12" width="2" height="8" fill="#4f46e5" />
+            </g>
+          </svg>
+        </div>
+        <p class="status-msg">Preparing your digital sanctuary...</p>
       </div>
     </div>
   </div>
+
   <style>
-    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-    .glass-effect { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+    :root { --indigo: #4f46e5; }
+    
+    .splash-screen {
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at center, #ffffff 0%, #f5f7ff 100%);
+    }
+
+    .content-wrapper { text-align: center; width: 100%; max-width: 600px; padding: 40px; }
+    
+    .svg-container { position: relative; margin-bottom: 2rem; overflow: visible; }
+    
+    .writing-text {
+      font-family: 'Dancing Script', cursive;
+      font-size: 82px;
+      fill: none;
+      stroke: var(--indigo);
+      stroke-width: 2;
+      stroke-dasharray: 1200;
+      stroke-dashoffset: 1200;
+      animation: draw-ink 3.5s cubic-bezier(0.45, 0, 0.55, 1) forwards;
+    }
+
+    .pen-nib {
+      offset-path: path("M80,100 L120,100 L160,100 L200,100 L240,100 L280,100 L320,100 L360,100 L400,100 L440,100 L480,100");
+      animation: move-pen 3.5s cubic-bezier(0.45, 0, 0.55, 1) forwards;
+      filter: drop-shadow(0 4px 6px rgba(79, 70, 229, 0.2));
+    }
+
+    .status-msg {
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      color: #94a3b8;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      opacity: 0;
+      animation: fade-up 0.8s ease-out 1.5s forwards;
+    }
+
+    @keyframes draw-ink {
+      0% { stroke-dashoffset: 1200; fill: rgba(79, 70, 229, 0); }
+      75% { stroke-dashoffset: 0; fill: rgba(79, 70, 229, 0); }
+      100% { stroke-dashoffset: 0; fill: rgba(79, 70, 229, 1); stroke-width: 0.5; }
+    }
+
+    @keyframes move-pen {
+      0% { offset-distance: 0%; opacity: 1; }
+      90% { offset-distance: 100%; opacity: 1; }
+      100% { offset-distance: 100%; opacity: 0; }
+    }
+
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .glass-effect { 
+      background: rgba(255, 255, 255, 0.8); 
+      backdrop-filter: blur(12px); 
+      -webkit-backdrop-filter: blur(12px); 
+    }
   </style>
   
   <script src="https://esm.sh/run"></script>

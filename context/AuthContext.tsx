@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, AuthState } from '../types';
 import { supabase } from '../lib/supabase';
@@ -18,8 +17,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const getRedirectUrl = () => {
   const path = window.location.pathname;
-  const baseUrl = window.location.origin + path.replace(/\/$/, '');
-  return baseUrl;
+  return window.location.origin + path.replace(/\/$/, '');
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -37,45 +35,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const refreshUser = async () => {
     try {
       const { data: { user: supabaseUser } } = await supabase.auth.getUser();
-      if (supabaseUser) {
-        setUser(mapUser(supabaseUser));
-      }
+      if (supabaseUser) setUser(mapUser(supabaseUser));
     } catch (e) {
-      console.error("Auth: Failed to refresh user", e);
+      console.error("Auth: Failed to refresh", e);
     }
   };
 
   useEffect(() => {
     let mounted = true;
-
-    // Check initial session with a safety timeout
     const checkSession = async () => {
-      const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve('timeout'), 5000));
-      
       try {
-        const result = await Promise.race([
-          supabase.auth.getSession(),
-          timeoutPromise
-        ]);
-
-        if (result === 'timeout') {
-          console.warn("Auth: Session check timed out. Proceeding as guest.");
-        } else if (mounted) {
-          const { data: { session } } = result as any;
-          if (session?.user) {
-            setUser(mapUser(session.user));
-          }
+        const { data: { session } } = await supabase.auth.getSession();
+        if (mounted && session?.user) {
+          setUser(mapUser(session.user));
         }
       } catch (err) {
         console.error("Auth: Session check failed", err);
       } finally {
-        if (mounted) setLoading(false);
+        // Add a tiny artificial delay so the animation can finish its first loop
+        setTimeout(() => {
+          if (mounted) setLoading(false);
+        }, 1500);
       }
     };
 
     checkSession();
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (mounted) {
         if (session?.user) {
@@ -83,7 +68,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
         }
-        setLoading(false);
       }
     });
 
@@ -106,31 +90,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { 
-        data: { username },
-        emailRedirectTo: getRedirectUrl()
-      },
+      options: { data: { username }, emailRedirectTo: getRedirectUrl() },
     });
-    
     if (error) return { success: false, error: error.message };
-    const needsVerification = data.user && !data.user.email_confirmed_at;
-    return { success: true, needsVerification };
+    return { success: true, needsVerification: data.user && !data.user.email_confirmed_at };
   };
 
   const verifyOtp = async (email: string, token: string) => {
-    const { data, error } = await supabase.auth.verifyOtp({
-      email,
-      token,
-      type: 'signup'
-    });
-    
+    const { data, error } = await supabase.auth.verifyOtp({ email, token, type: 'signup' });
     if (error) return { success: false, error: error.message };
-    
     if (data.user) {
       await refreshUser();
       return { success: true };
     }
-    return { success: false, error: 'Verification succeeded but session failed.' };
+    return { success: false, error: 'Session sync failed.' };
   };
 
   const resendVerification = async (email: string) => {
@@ -139,29 +112,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       email: email,
       options: { emailRedirectTo: getRedirectUrl() }
     });
-    if (error) return { success: false, error: error.message };
-    return { success: true };
+    return { success: !error, error: error?.message };
   };
 
-  const logout = async () => {
-    await supabase.auth.signOut();
-  };
+  const logout = async () => { await supabase.auth.signOut(); };
 
   const updateUser = async (data: Partial<User>) => {
-    const { error: authError } = await supabase.auth.updateUser({
-      data: { username: data.username, bio: data.bio }
-    });
-    if (!authError && user) {
-      setUser({ ...user, ...data });
-    }
+    const { error } = await supabase.auth.updateUser({ data: { username: data.username, bio: data.bio } });
+    if (!error && user) setUser({ ...user, ...data });
   };
 
   return (
     <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, signup, logout, resendVerification, verifyOtp, refreshUser, updateUser, loading }}>
       {loading ? (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
-          <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-gray-500 font-bold text-sm">Synchronizing Soul...</p>
+        <div className="min-h-screen flex items-center justify-center bg-white overflow-hidden">
+          <div className="text-center w-full max-w-lg px-8">
+            <svg viewBox="0 0 500 150" className="w-full h-auto overflow-visible">
+              <text x="50%" y="100" text-anchor="middle" className="writing-text" style={{ fontFamily: "'Dancing Script', cursive", fontSize: '82px', fill: 'none', stroke: '#4f46e5', strokeWidth: 2, strokeDasharray: 1200, strokeDashoffset: 1200, animation: 'draw-ink 3.5s infinite' }}>SoulJournal</text>
+            </svg>
+            <p className="mt-8 text-indigo-400 font-bold text-xs uppercase tracking-widest animate-pulse">Synchronizing Soul...</p>
+          </div>
         </div>
       ) : children}
     </AuthContext.Provider>

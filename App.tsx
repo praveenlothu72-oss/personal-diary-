@@ -19,14 +19,15 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
-// Fix: Explicitly using React.Component and adding a constructor to ensure 'props' is correctly typed and recognized by TypeScript.
+// Fix: Explicitly extending React.Component to ensure the 'props' property is correctly inherited and typed in the class.
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  public state: ErrorBoundaryState = {
+    hasError: false,
+    error: null,
+  };
+
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.state = {
-      hasError: false,
-      error: null,
-    };
   }
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
@@ -38,12 +39,15 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 
   public render(): ReactNode {
-    if (this.state.hasError) {
+    // Fix: Destructuring state for cleaner access and reliable type inference.
+    const { hasError, error } = this.state;
+
+    if (hasError) {
       return (
         <div className="min-h-screen flex items-center justify-center p-6 bg-red-50">
           <div className="max-w-md w-full bg-white p-8 rounded-3xl shadow-xl border border-red-100 text-center">
             <h2 className="text-2xl font-black text-red-600 mb-4">Oops! SoulJournal crashed.</h2>
-            <p className="text-gray-600 mb-6">{this.state.error?.message || "An unexpected error occurred."}</p>
+            <p className="text-gray-600 mb-6">{error?.message || "An unexpected error occurred."}</p>
             <button 
               onClick={() => window.location.reload()}
               className="px-6 py-3 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 transition-all"
@@ -55,6 +59,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
       );
     }
     
+    // Fix: Using this.props directly, which is now correctly recognized as existing on the ErrorBoundary class.
     return this.props.children || null;
   }
 }
@@ -64,7 +69,6 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return isAuthenticated ? <Layout>{children}</Layout> : <Navigate to="/login" replace />;
 };
 
-// Fix: Corrected PublicRoute redirect destination to send authenticated users to the dashboard instead of back to login.
 const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated } = useAuth();
   return !isAuthenticated ? <>{children}</> : <Navigate to="/dashboard" replace />;
